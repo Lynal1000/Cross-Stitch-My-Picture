@@ -695,13 +695,16 @@
       @media print { .page{padding:8mm;} }
     </style></head><body>`;
 
+    let totalChartPages = 1; // updated below depending on which branch runs
+
     if (!tooSmall) {
       // Everything fits on one page at a legible size.
+      totalChartPages = 1;
       const cellPx = cellMm * 3.7795; // mm -> px at 96dpi, close enough for screen+print
       const fontPx = Math.max(6, cellPx * 0.62);
       html += `<div class="page">
-        <h1>Cross Stitch My Picture</h1>
-        <div class="meta">${data.width}×${data.height} stitches — full chart, page 1 of 2</div>
+        <h1>Cross Stitch My Picture — Page 1 of 2</h1>
+        <div class="meta">${data.width}×${data.height} stitches — full chart</div>
         <table class="chart" style="font-size:${fontPx}px;">`;
       for (let y = 0; y < data.height; y++){
         const rowClass = ((y+1) % 10 === 0) ? ' class="tens-bottom"' : '';
@@ -726,18 +729,45 @@
       const MAX_PAGE_STITCHES_H = 65;
       const pagesX = Math.max(1, Math.ceil(data.width / MAX_PAGE_STITCHES_W));
       const pagesY = Math.max(1, Math.ceil(data.height / MAX_PAGE_STITCHES_H));
+      totalChartPages = pagesX * pagesY;
       // Evenly-sized column/row boundaries (e.g. 187 stitches over 4 pages
       // gives page widths of 47,47,47,46 — never a lone sliver page).
       const colBounds = Array.from({length: pagesX+1}, (_, i) => Math.round(i * data.width / pagesX));
       const rowBounds = Array.from({length: pagesY+1}, (_, i) => Math.round(i * data.height / pagesY));
 
+      // Small locator diagram: a miniature of the whole pattern with the
+      // current page's tile outlined, so it's obvious which part of the
+      // picture a given printed sheet covers without counting stitches.
+      const LOCATOR_PX = 70; // overall diagram box size on the page
+      function buildLocatorSvg(px, py){
+        const cellW = LOCATOR_PX / pagesX;
+        const cellH = LOCATOR_PX / pagesY;
+        let svg = `<svg width="${LOCATOR_PX}" height="${LOCATOR_PX}" style="border:1px solid #999;background:#f4f4f4;flex-shrink:0;">`;
+        for (let ry = 0; ry < pagesY; ry++){
+          for (let rx = 0; rx < pagesX; rx++){
+            const isCurrent = (rx === px && ry === py);
+            svg += `<rect x="${rx*cellW}" y="${ry*cellH}" width="${cellW}" height="${cellH}" ` +
+              `fill="${isCurrent ? '#B5443A' : '#fff'}" stroke="#bbb" stroke-width="0.5"/>`;
+          }
+        }
+        svg += `</svg>`;
+        return svg;
+      }
+
       for (let py = 0; py < pagesY; py++){
         for (let px = 0; px < pagesX; px++){
           const x0 = colBounds[px], x1 = colBounds[px+1];
           const y0 = rowBounds[py], y1 = rowBounds[py+1];
+          const pageNum = py*pagesX+px+1;
+          const totalPages = pagesX*pagesY;
           html += `<div class="page">
-            <h1>Cross Stitch My Picture</h1>
-            <div class="meta">Chart page ${py*pagesX+px+1} of ${pagesX*pagesY} — stitches ${x0+1}-${x1} × ${y0+1}-${y1} of ${data.width}×${data.height}</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+              ${buildLocatorSvg(px, py)}
+              <div>
+                <h1 style="margin-bottom:2px;">Cross Stitch My Picture — Page ${pageNum} of ${totalPages}</h1>
+                <div class="meta" style="margin-bottom:0;">Grid position: row ${py+1} of ${pagesY}, column ${px+1} of ${pagesX} &nbsp;·&nbsp; stitches ${x0+1}-${x1} across, ${y0+1}-${y1} down &nbsp;·&nbsp; full pattern is ${data.width}×${data.height}</div>
+              </div>
+            </div>
             <table class="chart">`;
           for (let y = y0; y < y1; y++){
             const rowClass = ((y+1) % 10 === 0) ? ' class="tens-bottom"' : '';
@@ -755,7 +785,7 @@
     }
 
     // Final legend page
-    html += `<div class="page"><h1>Colour key</h1><div class="meta">${tooSmall ? '' : 'Page 2 of 2 — '}${codesUsed.length} DMC thread colours</div><div class="legend"><table>`;
+    html += `<div class="page"><h1>Colour key — Page ${totalChartPages+1} of ${totalChartPages+1}</h1><div class="meta">${codesUsed.length} DMC thread colours</div><div class="legend"><table>`;
     codesUsed.forEach(code => {
       const dmc = DMC_PALETTE.find(c => c.c === code);
       const anchorCode = DMC_TO_ANCHOR[code];
