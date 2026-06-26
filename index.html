@@ -321,6 +321,7 @@
 </div>
 
 <script src="dmc_colors.js"></script>
+<script src="anchor_codes.js"></script>
 <script>
 (function(){
   "use strict";
@@ -598,10 +599,11 @@
       const skeinsNeeded = Math.max(1, Math.ceil(inchesNeeded / skeinLengthInches));
 
       const li = document.createElement('li');
+      const anchorCode = DMC_TO_ANCHOR[dmc.c];
       li.innerHTML = `
         <div class="swatch" style="background:rgb(${dmc.r[0]},${dmc.r[1]},${dmc.r[2]})"></div>
         <div class="thread-info">
-          <div class="thread-code">DMC ${dmc.c}</div>
+          <div class="thread-code">DMC ${dmc.c}${anchorCode ? ` <span style="color:#857c6c;font-weight:400;">· Anchor ${anchorCode}</span>` : ''}</div>
           <div class="thread-name">${dmc.n}</div>
         </div>
         <div class="thread-amount">
@@ -635,10 +637,32 @@
     const codesUsed = Object.keys(data.usedCounts).sort((a,b)=>data.usedCounts[b]-data.usedCounts[a]);
     const symbolMap = buildSymbolMap(codesUsed);
 
-    const PAGE_STITCHES_W = 50; // stitches per printed page, a common chart-software default
-    const PAGE_STITCHES_H = 70;
-    const pagesX = Math.ceil(data.width / PAGE_STITCHES_W);
-    const pagesY = Math.ceil(data.height / PAGE_STITCHES_H);
+    // Fit the whole chart onto a single printable page by shrinking the
+    // cell size to match the pattern's dimensions, rather than splitting
+    // across several fixed-size pages. A standard page has a printable
+    // area of roughly 190mm × 270mm after margins; below about 2.2mm a
+    // stitch symbol becomes too small to read or count accurately, so
+    // below that point we say so rather than print something useless.
+    const PRINTABLE_MM_W = 190;
+    const PRINTABLE_MM_H = 250; // leaves room for the title/meta line
+    const MIN_LEGIBLE_CELL_MM = 2.2;
+
+    const cellMmByWidth = PRINTABLE_MM_W / data.width;
+    const cellMmByHeight = PRINTABLE_MM_H / data.height;
+    const cellMm = Math.min(cellMmByWidth, cellMmByHeight);
+    const tooSmall = cellMm < MIN_LEGIBLE_CELL_MM;
+
+    if (tooSmall) {
+      const ok = confirm(
+        `This pattern is ${data.width}×${data.height} stitches — too large to fit on one ` +
+        `readable page (each stitch would print smaller than ${cellMm.toFixed(1)}mm, too small ` +
+        `to count or see the symbol in).\n\nYou can still print it this way, but it won't be ` +
+        `stitchable from. For a usable chart, either reduce the pattern width in step 2 and ` +
+        `regenerate, or continue and it will print across multiple legible pages instead.\n\n` +
+        `Press OK to print across multiple pages (recommended), or Cancel to go back and reduce the size.`
+      );
+      if (!ok) return;
+    }
 
     const printWin = window.open('', '_blank');
     if (!printWin) {
@@ -649,57 +673,92 @@
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cross Stitch My Picture — Pattern</title>
     <style>
       body{font-family:Georgia,serif; margin:0; padding:0; color:#222;}
-      .page{page-break-after:always; padding:24px;}
+      .page{page-break-after:always; padding:10mm;}
       .page:last-child{page-break-after:auto;}
-      h1{font-size:18px; margin:0 0 4px;}
-      .meta{font-size:12px; color:#555; margin-bottom:14px;}
+      h1{font-size:16px; margin:0 0 4px;}
+      .meta{font-size:11px; color:#555; margin-bottom:10px;}
       table.chart{border-collapse:collapse;}
       table.chart td{
-        width:14px; height:14px; text-align:center; vertical-align:middle;
-        font-size:9px; border:1px solid #ddd; padding:0;
+        text-align:center; vertical-align:middle;
+        border:0.5px solid #ddd; padding:0; line-height:1;
       }
-      table.chart td.tens-right{border-right:2px solid #888;}
-      table.chart tr.tens-bottom td{border-bottom:2px solid #888;}
-      .legend{margin-top:20px; font-size:12px;}
+      table.chart td.tens-right{border-right:1.5px solid #888;}
+      table.chart tr.tens-bottom td{border-bottom:1.5px solid #888;}
+      .legend{margin-top:10px; font-size:12px;}
       .legend table{border-collapse:collapse; width:100%;}
       .legend td{padding:3px 8px; border-bottom:1px solid #eee;}
       .legend .sym{font-size:14px; width:24px; text-align:center;}
-      @media print { .page{padding:10mm;} }
+      @media print { .page{padding:8mm;} }
     </style></head><body>`;
 
-    for (let py = 0; py < pagesY; py++){
-      for (let px = 0; px < pagesX; px++){
-        const x0 = px * PAGE_STITCHES_W;
-        const y0 = py * PAGE_STITCHES_H;
-        const x1 = Math.min(x0 + PAGE_STITCHES_W, data.width);
-        const y1 = Math.min(y0 + PAGE_STITCHES_H, data.height);
-
-        html += `<div class="page">
-          <h1>Cross Stitch My Picture</h1>
-          <div class="meta">Page ${py*pagesX+px+1} of ${pagesX*pagesY} — stitches ${x0+1}-${x1} × ${y0+1}-${y1} of ${data.width}×${data.height}</div>
-          <table class="chart">`;
-        for (let y = y0; y < y1; y++){
-          const rowClass = ((y+1) % 10 === 0) ? ' class="tens-bottom"' : '';
-          html += `<tr${rowClass}>`;
-          for (let x = x0; x < x1; x++){
-            const dmc = data.grid[y*data.width+x];
-            const cellClass = ((x+1) % 10 === 0) ? ' class="tens-right"' : '';
-            html += `<td${cellClass} style="background:rgb(${dmc.r[0]},${dmc.r[1]},${dmc.r[2]})">${symbolMap[dmc.c]}</td>`;
-          }
-          html += `</tr>`;
+    if (!tooSmall) {
+      // Everything fits on one page at a legible size.
+      const cellPx = cellMm * 3.7795; // mm -> px at 96dpi, close enough for screen+print
+      const fontPx = Math.max(6, cellPx * 0.62);
+      html += `<div class="page">
+        <h1>Cross Stitch My Picture</h1>
+        <div class="meta">${data.width}×${data.height} stitches — full chart, page 1 of 2</div>
+        <table class="chart" style="font-size:${fontPx}px;">`;
+      for (let y = 0; y < data.height; y++){
+        const rowClass = ((y+1) % 10 === 0) ? ' class="tens-bottom"' : '';
+        html += `<tr${rowClass}>`;
+        for (let x = 0; x < data.width; x++){
+          const dmc = data.grid[y*data.width+x];
+          const cellClass = ((x+1) % 10 === 0) ? ' class="tens-right"' : '';
+          html += `<td${cellClass} style="width:${cellPx}px;height:${cellPx}px;background:rgb(${dmc.r[0]},${dmc.r[1]},${dmc.r[2]})">${symbolMap[dmc.c]}</td>`;
         }
-        html += `</table></div>`;
+        html += `</tr>`;
+      }
+      html += `</table></div>`;
+    } else {
+      // Fall back to a multi-page chart. Rather than slicing at a FIXED
+      // page size (which leaves a thin sliver row/column on the last page
+      // whenever the pattern doesn't divide evenly — the "one line on
+      // every other page" problem), we first work out the minimum number
+      // of pages needed at a legible cell size, then divide the pattern
+      // EVENLY across that many pages so every page carries a similar
+      // amount of the chart.
+      const MAX_PAGE_STITCHES_W = 50; // upper bound per page at a legible size
+      const MAX_PAGE_STITCHES_H = 65;
+      const pagesX = Math.max(1, Math.ceil(data.width / MAX_PAGE_STITCHES_W));
+      const pagesY = Math.max(1, Math.ceil(data.height / MAX_PAGE_STITCHES_H));
+      // Evenly-sized column/row boundaries (e.g. 187 stitches over 4 pages
+      // gives page widths of 47,47,47,46 — never a lone sliver page).
+      const colBounds = Array.from({length: pagesX+1}, (_, i) => Math.round(i * data.width / pagesX));
+      const rowBounds = Array.from({length: pagesY+1}, (_, i) => Math.round(i * data.height / pagesY));
+
+      for (let py = 0; py < pagesY; py++){
+        for (let px = 0; px < pagesX; px++){
+          const x0 = colBounds[px], x1 = colBounds[px+1];
+          const y0 = rowBounds[py], y1 = rowBounds[py+1];
+          html += `<div class="page">
+            <h1>Cross Stitch My Picture</h1>
+            <div class="meta">Chart page ${py*pagesX+px+1} of ${pagesX*pagesY} — stitches ${x0+1}-${x1} × ${y0+1}-${y1} of ${data.width}×${data.height}</div>
+            <table class="chart">`;
+          for (let y = y0; y < y1; y++){
+            const rowClass = ((y+1) % 10 === 0) ? ' class="tens-bottom"' : '';
+            html += `<tr${rowClass}>`;
+            for (let x = x0; x < x1; x++){
+              const dmc = data.grid[y*data.width+x];
+              const cellClass = ((x+1) % 10 === 0) ? ' class="tens-right"' : '';
+              html += `<td${cellClass} style="width:14px;height:14px;font-size:9px;background:rgb(${dmc.r[0]},${dmc.r[1]},${dmc.r[2]})">${symbolMap[dmc.c]}</td>`;
+            }
+            html += `</tr>`;
+          }
+          html += `</table></div>`;
+        }
       }
     }
 
     // Final legend page
-    html += `<div class="page"><h1>Colour key</h1><div class="legend"><table>`;
+    html += `<div class="page"><h1>Colour key</h1><div class="meta">${tooSmall ? '' : 'Page 2 of 2 — '}${codesUsed.length} DMC thread colours</div><div class="legend"><table>`;
     codesUsed.forEach(code => {
       const dmc = DMC_PALETTE.find(c => c.c === code);
+      const anchorCode = DMC_TO_ANCHOR[code];
       html += `<tr>
         <td class="sym">${symbolMap[code]}</td>
         <td style="background:rgb(${dmc.r[0]},${dmc.r[1]},${dmc.r[2]});width:24px;"></td>
-        <td><b>DMC ${dmc.c}</b> — ${dmc.n}</td>
+        <td><b>DMC ${dmc.c}</b>${anchorCode ? ` <span style="color:#777;">(Anchor ${anchorCode})</span>` : ''} — ${dmc.n}</td>
         <td>${data.usedCounts[code].toLocaleString()} stitches</td>
       </tr>`;
     });

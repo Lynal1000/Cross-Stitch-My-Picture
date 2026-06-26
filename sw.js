@@ -6,6 +6,7 @@ const ASSETS = [
   './index.html',
   './manifest.json',
   './dmc_colors.js',
+  './anchor_codes.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
