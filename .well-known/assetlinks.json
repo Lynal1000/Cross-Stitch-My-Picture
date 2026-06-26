@@ -1,1 +1,9 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.lynal1000.twa",
+        "sha256_cert_fingerprints": ["A7:2A:A3:29:CD:4B:EF:00:3B:B4:79:A7:A7:DF:AA:90:91:EC:80:28:2B:75:58:45:06:18:69:58:6C:60:E3:60"]
+      }
+    }]
 
