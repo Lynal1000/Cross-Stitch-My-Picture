@@ -306,7 +306,10 @@
     <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn secondary" id="printBtn" style="flex:1 1 100%;">Print pattern</button>
       <button class="btn secondary" id="downloadBtn" style="flex:1;">Save chart image</button>
-      <button class="btn secondary" id="startOverBtn" style="flex:1;">New photo</button>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn secondary" id="adjustBtn" style="flex:1;">Adjust size/colours</button>
+      <button class="btn secondary" id="startOverBtn" style="flex:1;">Different photo</button>
     </div>
   </div>
 
@@ -346,6 +349,7 @@
   const generateBtn = document.getElementById('generateBtn');
   const patternCanvas = document.getElementById('patternCanvas');
   const downloadBtn = document.getElementById('downloadBtn');
+  const adjustBtn = document.getElementById('adjustBtn');
   const startOverBtn = document.getElementById('startOverBtn');
   const threadList = document.getElementById('threadList');
   const statSize = document.getElementById('statSize');
@@ -777,6 +781,14 @@
     link.download = 'cross-stitch-pattern.png';
     link.href = patternCanvas.toDataURL('image/png');
     link.click();
+  });
+
+  adjustBtn.addEventListener('click', () => {
+    // Keep the photo and current slider values exactly as they are —
+    // just bring the size/colour controls back into view so the person
+    // can tweak and regenerate without re-uploading.
+    settingsCard.classList.remove('hidden');
+    settingsCard.scrollIntoView({behavior:'smooth', block:'start'});
   });
 
   startOverBtn.addEventListener('click', () => {
